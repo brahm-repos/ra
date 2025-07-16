@@ -1,0 +1,78 @@
+# LLM Configuration
+llm:
+  provider: "openai"
+  api_key: "${OPENAI_API_KEY}"
+  model: "gpt-4o"
+  temperature: 0.1
+  max_tokens: 1000
+
+# Folder Configuration
+folders:
+  job_descriptions: "data/JDs"
+  resumes: "data/Resumes"
+
+# Prompt Templates
+prompts:
+  resume_analysis:
+    system: |
+      you are a recruiter who has extensive experience in reviewing and shortlisting resumes. currently date is 
+      {todays_date}, so go over dates based on this while looking at the experience and job durations. 
+      Your task is to analyze whether a candidate's  resume matches a job description.
+
+      Be thorough and fair in your assessment. Focus on the most important requirements for the role. Provide 
+      brief and concise answers. if you do not know the answer say no. Do not make anything up if you have not 
+      provided with the relevant context.
+
+    user: |
+      Review the below resume against the job description given and provide the following.
+        A determine if candidate is a good match or not for the job, 
+        B: and provide a detailed summary explaining your decision on the below items and provide the 
+        following in separate sections.
+          0: Rate this profile on a scale of 1(weak match) to 10 (strong match) and provide reason for your score. score overall, and separately on technical, functional, AI/ML/LLM experience, general experience.
+          1: Summary of resume
+          2: Key skills (technical , functional)
+          3: Key strengths of the candidate
+          4: Key weaknesses (missed key aspects from standard career paths)
+          5: List down the job chronology (company/client, title, project name, dates)
+          6: How this person's career has grown?
+          7: How does this profile matches the attached JD of a Technical Solution Architect
+          8: Critically match the 'Experience', 'Responsibilities', 'Technical Skills', 'Optional Skills', 'Education'. Identify any gaps and highlight.
+
+        JOB DESCRIPTION:
+        {job_description}
+        
+        RESUME:
+        {resume_text}
+
+  resume_analysis002: |
+    You are an expert HR recruiter and resume analyst. Your task is to analyze whether a candidate's 
+    resume matches a job description.
+
+    JOB DESCRIPTION:
+    {job_description}
+
+    RESUME:
+    {resume_text}
+
+    Please analyze the match and provide your response. You should extract the person's name from the 
+    resume, determine if they are a good match for the job, and provide a detailed summary explaining 
+    your decision.
+
+    Be thorough and fair in your assessment. Focus on the most important requirements for the role. Provide 
+    brief and concise answers. if you do not know the answer say no.
+    Do not make anything up if you have not provided with the relevant context.
+
+  interview_questions:
+    system: |
+      You are an expert interviewer for the following job description.
+    user: |
+      JOB DESCRIPTION:
+      {job_description}
+
+      Please generate 10 interview questions for the selected candidate.
+
+# Logging Configuration
+logging:
+  level: "INFO"
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  file: "resume_matcher.log" 

@@ -1,0 +1,19 @@
+I would like you to generate a ui using gradio as below
+
+1. Title: HR Analyst Agnet 
+2. Divide the screen into 2 parts. one part is left panel which should be 1/2 of the screen and second part os right panel other half.
+3. Left Panel consists of 
+    drop down named "Select JD" 
+    dorpdown values come from the method ResumeAnalyzer.get_available_jds method.
+    use the ResumeAnalyer instantiated in the main.py 
+    When the user selects the JD from the dropdown, corresponding JD should be should be shown as link.
+    When user clicks on the link, a model pane shows up with the contents of the JD.
+
+    below these ui artifacts, there should be a button that says "Analyze"
+    When the Analye button is clicked, execute router.analyze_jd(args.jd)
+    once done, results are displayed in right side of the panel.
+4. Right Panel consists of
+    Right side of the panel displays the results of the result = router.analyze_jd(args.jd)
+    as mentioned above. 
+    it also would display the links to see the summary analysis of why matched and not matached.
+    it should also have the link to down this analysis as md file.

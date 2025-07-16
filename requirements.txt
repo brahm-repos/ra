@@ -1,0 +1,8 @@
+pydantic-ai
+PyPDF2
+python-dotenv
+chromadb
+openai
+pyyaml
+gradio
+markdown

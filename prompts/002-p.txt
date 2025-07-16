@@ -1,0 +1,9 @@
+add a separate python class in separate python file that does the following
+1. takes folder as  JD folder and loads all the files in that folder with the key as the file name and value as the text of the PDF file 
+2. maintain in memory cache like hasmap or dicttionaly that gives the contents of the PDF file by its key which is JD name or file name.
+2. takes a folder as resumes folder and loads all the files int that folder with they jey as the file name and value as the text of the PDF file with that key
+3. maintains in memory cache like hashmap or dictionaly with contents of the PDF file by its key which is name of the PDF file. 
+3. main.py instansticates this class and loads the files into Cache 
+4. JD folder name and resume folder name are configurable in the config file.
+
+Please update the code to reflect the above.

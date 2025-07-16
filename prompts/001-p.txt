@@ -1,0 +1,9 @@
+Create a main python class and main program that does the following
+- reads a config yaml file that has llm keys and model names 
+- takes "job decription" (referred as JD) and a resume as parmaters.
+- Generate appropriates prompt to the llm (which can be configured via yaml file with place holders) 
+  that takes a JD and resume and promopts the llm to see if the resume matches the JD. 
+- the output of llm shoul be of the format
+  name of the person whose resume is analyzed , match or no-match. if match summary. if no match summary of why not.
+- Code should have the logfire to monitir
+- Generate the code, sample yaml file, test python script to test with samples

@@ -1,0 +1,6 @@
+Thank you. it seems to be working. There are few changes required as below
+1.  when the "Analyze" button is clicked, this button should be disabled till 
+the analysis is completed and results are shown.
+show the processing status in the right side of the panel till the analyze is done. 
+2. On the right pabel results summary, please add links to the table such that 
+when clicked analysis details are opened in a modal window to view and close

@@ -1,0 +1,62 @@
+John Smith
+Senior Software Engineer
+john.smith@email.com | (555) 123-4567 | linkedin.com/in/johnsmith
+
+PROFESSIONAL SUMMARY
+Experienced Python developer with 6+ years of expertise in building scalable web applications, microservices, and cloud-native solutions. Proven track record of leading development teams and delivering high-quality software products.
+
+TECHNICAL SKILLS
+Programming Languages: Python, JavaScript, SQL
+Frameworks & Libraries: Django, Flask, FastAPI, React
+Databases: PostgreSQL, MySQL, MongoDB, Redis
+Cloud Platforms: AWS (EC2, S3, Lambda, RDS), Azure, Google Cloud
+DevOps & Tools: Docker, Kubernetes, Jenkins, Git, GitHub Actions
+APIs & Services: RESTful APIs, GraphQL, Microservices
+Other: CI/CD, Agile/Scrum, TDD, Unit Testing
+
+PROFESSIONAL EXPERIENCE
+
+Senior Python Developer | TechCorp Inc. | 2021 - Present
+- Lead development of microservices architecture using FastAPI and Django
+- Implemented CI/CD pipelines using Jenkins and GitHub Actions
+- Deployed applications on AWS using Docker containers and Kubernetes
+- Mentored 3 junior developers and conducted code reviews
+- Reduced API response time by 40% through optimization and caching
+- Collaborated with cross-functional teams to deliver features on time
+
+Python Developer | StartupXYZ | 2019 - 2021
+- Developed RESTful APIs using Django REST Framework
+- Built and maintained PostgreSQL databases with complex queries
+- Implemented authentication and authorization systems
+- Worked with React frontend and integrated with Python backend
+- Participated in agile development process with 2-week sprints
+
+Junior Developer | CodeWorks | 2018 - 2019
+- Developed web applications using Django and Flask
+- Worked with MySQL databases and implemented data models
+- Used Git for version control and collaborated with team members
+- Learned best practices in software development and testing
+
+EDUCATION
+Bachelor of Science in Computer Science
+University of Technology | 2014 - 2018
+GPA: 3.8/4.0
+
+CERTIFICATIONS
+- AWS Certified Developer Associate
+- Docker Certified Associate
+- Python Institute Certified Professional
+
+PROJECTS
+E-commerce Platform: Built a full-stack e-commerce application using Django, PostgreSQL, and React
+- Implemented user authentication, payment processing, and inventory management
+- Deployed on AWS using Docker containers
+- Handled 10,000+ concurrent users
+
+API Gateway: Developed a microservices API gateway using FastAPI
+- Implemented rate limiting, authentication, and request routing
+- Integrated with multiple backend services
+- Achieved 99.9% uptime in production
+
+LANGUAGES
+English (Native), Spanish (Conversational) 
