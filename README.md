@@ -172,9 +172,8 @@ The `config.yaml` file contains prompt templates, folder paths, and logging conf
 ```yaml
 # LLM Configuration (handled by Pydantic AI)
 llm:
-  provider: "openai"
-  api_key: "${OPENAI_API_KEY}"  # Uses environment variable
-  model: "gpt-4o"
+  provider: "openai"  # or "azure_openai" for Azure AI Foundry
+  model: "gpt-4o"     # For Azure, this should be your deployment name
   temperature: 0.1
   max_tokens: 1000
 
@@ -195,6 +194,32 @@ logging:
   format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
   file: "resume_matcher.log"
 ```
+
+### Using Azure OpenAI (Azure AI Foundry)
+
+To use Azure OpenAI as your LLM provider, set the following environment variables **before running your app**:
+
+```sh
+export AZURE_OPENAI_API_KEY="<your-azure-openai-api-key>"
+export AZURE_OPENAI_ENDPOINT="<your-azure-endpoint>"
+export AZURE_OPENAI_API_VERSION="2025-01-01-preview"  # Optional, defaults to this value
+```
+
+- `AZURE_OPENAI_API_KEY`: Your Azure OpenAI API key
+- `AZURE_OPENAI_ENDPOINT`: Your Azure endpoint, e.g. `https://your-resource.openai.azure.com/openai/deployments/<deployment-name>/chat/completions?api-version=2025-01-01-preview`
+- `AZURE_OPENAI_API_VERSION`: (Optional) API version, defaults to `2025-01-01-preview`
+
+**Example:**
+```sh
+export AZURE_OPENAI_API_KEY="ArkYjTtoYuQUFbZvRq43iM9EQTUqAfRgdYqBVMQqov66HYAIAkKcJQQJ99BGACYeBjFXJ3w3AAABACOGMhz0"
+export AZURE_OPENAI_ENDPOINT="https://resume-review.openai.azure.com/openai/deployments/gpt-4o/chat/completions?api-version=2025-01-01-preview"
+```
+
+**Note:** The environment variable names must match exactly as above.
+
+### Switching between OpenAI and Azure OpenAI
+- To use OpenAI: set `provider: "openai"` in `config.yaml` and set `OPENAI_API_KEY` in your environment.
+- To use Azure OpenAI: set `provider: "azure_openai"` in `config.yaml` and set the Azure environment variables as above.
 
 **Note**: Pydantic AI handles the LLM configuration automatically. The `llm` section in config.yaml is kept for reference but not used by the current implementation.
 

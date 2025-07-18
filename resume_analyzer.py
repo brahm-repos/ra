@@ -3,6 +3,8 @@ from typing import Dict, Any
 from pydantic import BaseModel, Field
 from pydantic_ai import Agent
 import re
+from pydantic_ai.models.openai import OpenAIModel
+from pydantic_ai.providers.azure import AzureProvider
 
 class AnalysisResult(BaseModel):
     """Result of resume analysis using Pydantic."""
@@ -24,22 +26,43 @@ class ResumeAnalyzer(Agent):
         
         Args:
             prompt_template: The prompt template for resume analysis
-            model: The model to use for analysis
-            api_key: OpenAI API key
+            model: The model to use for analysis (deployment name for Azure)
+            api_key: (deprecated, kept for compatibility)
             logger: Logger instance (optional)
+            config: Full configuration dictionary (should include LLM settings)
         """
-        super().__init__()
         self.prompt_template = prompt_template  # Now a dict with 'system' and 'user'
-        self.model = model
-        self.api_key = api_key
         self.logger = logger or logging.getLogger(__name__)
         self.config = config  # Store the full config for access to interview_questions
-        
-        # Set the API key as an environment variable for Pydantic AI
+
         import os
-        os.environ["OPENAI_API_KEY"] = api_key
-        
-        self.logger.info("ResumeAnalyzer initialized successfully")
+        llm_conf = (config or {}).get('llm', {})
+        provider = llm_conf.get('provider', 'openai')
+        deployment_name = llm_conf.get('model', 'gpt-4o')
+
+        if provider == "azure_openai":
+            azure_endpoint = os.environ.get("AZURE_OPENAI_ENDPOINT")
+            api_key = os.environ.get("AZURE_OPENAI_API_KEY")
+            api_version = os.environ.get("AZURE_OPENAI_API_VERSION", "2025-01-01-preview")
+            if not (azure_endpoint and api_key):
+                raise ValueError("AZURE_OPENAI_ENDPOINT and AZURE_OPENAI_API_KEY must be set in environment for Azure OpenAI.")
+            model_obj = OpenAIModel(
+                deployment_name,
+                provider=AzureProvider(
+                    azure_endpoint=azure_endpoint,
+                    api_version=api_version,
+                    api_key=api_key,
+                ),
+            )
+        else:
+            # Default to OpenAI
+            api_key = os.environ.get("OPENAI_API_KEY")
+            if not api_key:
+                raise ValueError("OPENAI_API_KEY must be set in environment for OpenAI provider.")
+            model_obj = OpenAIModel(deployment_name, api_key=api_key)
+
+        super().__init__(model_obj)
+        self.logger.info(f"ResumeAnalyzer initialized successfully with provider: {provider}")
     
 
 

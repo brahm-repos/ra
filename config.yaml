@@ -1,7 +1,9 @@
 # LLM Configuration
 llm:
-  provider: "openai"
-  api_key: "${OPENAI_API_KEY}"
+  provider: "azure_openai"
+  api_key: "${AZURE_OPENAI_API_KEY}"
+  endpoint: "${AZURE_OPENAI_ENDPOINT}"
+  region: "${AZURE_OPENAI_REGION}"
   model: "gpt-4o"
   temperature: 0.1
   max_tokens: 1000
