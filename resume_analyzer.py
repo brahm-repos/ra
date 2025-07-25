@@ -54,12 +54,24 @@ class ResumeAnalyzer(Agent):
                     api_key=api_key,
                 ),
             )
+            # Log or print the endpoint being used
+            msg = f"Using Azure OpenAI endpoint: {azure_endpoint} (API version: {api_version})"
+            if self.logger:
+                self.logger.info(msg)
+            else:
+                print(msg)
         else:
             # Default to OpenAI
             api_key = os.environ.get("OPENAI_API_KEY")
             if not api_key:
                 raise ValueError("OPENAI_API_KEY must be set in environment for OpenAI provider.")
             model_obj = OpenAIModel(deployment_name, api_key=api_key)
+            # Log or print the OpenAI usage
+            msg = "Using OpenAI API (endpoint managed by OpenAI SDK)"
+            if self.logger:
+                self.logger.info(msg)
+            else:
+                print(msg)
 
         super().__init__(model_obj)
         self.logger.info(f"ResumeAnalyzer initialized successfully with provider: {provider}")

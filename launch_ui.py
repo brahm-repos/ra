@@ -8,6 +8,21 @@ import os
 
 def main():
     """Launch the Gradio UI."""
+    # Check required environment variables
+    required_env_vars = [
+        ("AZURE_OPENAI_ENDPOINT", "https://<your-resource-name>.openai.azure.com/"),
+        ("AZURE_OPENAI_API_KEY", "<your-azure-openai-api-key>"),
+        ("AZURE_OPENAI_REGION", "<your-azure-region>")
+    ]
+    missing_vars = [var for var, _ in required_env_vars if not os.environ.get(var)]
+    if missing_vars:
+        print("\nERROR: The following required environment variables are not set:")
+        for var, example in required_env_vars:
+            if var in missing_vars:
+                print(f"  {var}  (example: {example})")
+        print("\nPlease set these variables and re-run the application.\n")
+        sys.exit(1)
+
     try:
         # Check if gradio is installed
         try:
