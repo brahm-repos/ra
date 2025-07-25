@@ -104,17 +104,28 @@ class ResumeAnalyzer(Agent):
                 resume_text=resume_text
             )
             prompt = f"{system_prompt}\n\n{user_prompt}"
+
+            # DEBUG: Log prompt and model details
+            self.logger.debug(f"LLM Model: {self.model}")
+            if hasattr(self, 'config') and self.config and 'llm' in self.config:
+                llm_conf = self.config['llm']
+                self.logger.debug(f"LLM Config: {llm_conf}")
+            import os
+            endpoint = os.environ.get("AZURE_OPENAI_ENDPOINT") or os.environ.get("OPENAI_API_BASE")
+            self.logger.debug(f"LLM Endpoint: {endpoint}")
+            self.logger.debug(f"Prompt sent to LLM:\n{prompt}")
             
             # Use Pydantic AI's run method to get structured output with model from config
             agent_result = await self.run(prompt, model=self.model)
             
             # Debug: Log the structure of the result
-            self.logger.info(f"Agent result type: {type(agent_result)}")
-            self.logger.info(f"Agent result attributes: {dir(agent_result)}")
+            self.logger.debug(f"Agent result type: {type(agent_result)}")
+            self.logger.debug(f"Agent result attributes: {dir(agent_result)}")
             
             # Extract the output from AgentRunResult
             if hasattr(agent_result, 'output'):
                 output_text = agent_result.output
+                self.logger.debug(f"LLM Raw Output:\n{output_text}")
                 self.logger.info(f"Extracted output type: {type(output_text)}")
             else:
                 self.logger.error("No output found in agent result")
@@ -128,7 +139,7 @@ class ResumeAnalyzer(Agent):
             return result
             
         except Exception as e:
-            self.logger.error(f"Error during resume analysis: {e}")
+            self.logger.error(f"Error during resume analysis: {e}", exc_info=True)
             raise
     
     def _parse_output_to_analysis_result(self, output_text: str) -> AnalysisResult:
