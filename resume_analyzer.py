@@ -5,6 +5,8 @@ from pydantic_ai import Agent
 import re
 from pydantic_ai.models.openai import OpenAIModel
 from pydantic_ai.providers.azure import AzureProvider
+from pydantic_ai.settings import ModelSettings
+
 
 class AnalysisResult(BaseModel):
     """Result of resume analysis using Pydantic."""
@@ -41,21 +43,32 @@ class ResumeAnalyzer(Agent):
         deployment_name = llm_conf.get('model', 'gpt-4o')
 
         if provider == "azure_openai":
+            from openai import AsyncAzureOpenAI
             azure_endpoint = os.environ.get("AZURE_OPENAI_ENDPOINT")
             api_key = os.environ.get("AZURE_OPENAI_API_KEY")
             api_version = os.environ.get("AZURE_OPENAI_API_VERSION", "2025-01-01-preview")
+            # Read timeout from config, default to 60 seconds if not set
+            timeout = llm_conf.get('timeout', 60)
+            
             if not (azure_endpoint and api_key):
                 raise ValueError("AZURE_OPENAI_ENDPOINT and AZURE_OPENAI_API_KEY must be set in environment for Azure OpenAI.")
+            
+            # Create AsyncAzureOpenAI client with timeout
+            azure_client = AsyncAzureOpenAI(
+                azure_endpoint=azure_endpoint,
+                api_key=api_key,
+                api_version=api_version,
+                timeout=timeout,  # Set timeout directly on the client
+            )
+            
             model_obj = OpenAIModel(
                 deployment_name,
                 provider=AzureProvider(
-                    azure_endpoint=azure_endpoint,
-                    api_version=api_version,
-                    api_key=api_key,
+                    openai_client=azure_client,  # Pass the client with timeout
                 ),
             )
             # Log or print the endpoint being used
-            msg = f"Using Azure OpenAI endpoint: {azure_endpoint} (API version: {api_version})"
+            msg = f"Using Azure OpenAI endpoint: {azure_endpoint} (API version: {api_version}, timeout: {timeout}s)"
             if self.logger:
                 self.logger.info(msg)
             else:
@@ -116,6 +129,7 @@ class ResumeAnalyzer(Agent):
             self.logger.debug(f"Prompt sent to LLM:\n{prompt}")
             
             # Use Pydantic AI's run method to get structured output with model from config
+            timeout = llm_conf.get('timeout', 60)
             agent_result = await self.run(prompt, model=self.model)
             
             # Debug: Log the structure of the result
@@ -241,6 +255,7 @@ class ResumeAnalyzer(Agent):
         system_prompt = prompts['system']
         user_prompt = prompts['user'].format(job_description=job_description)
         prompt = f"{system_prompt}\n\n{user_prompt}"
+        timeout = (self.config or {}).get('llm', {}).get('timeout', 60)
         agent_result = await self.run(prompt, model=self.model)
         if hasattr(agent_result, 'output'):
             return agent_result.output

@@ -6,7 +6,8 @@ llm:
   region: "${AZURE_OPENAI_REGION}"
   model: "gpt-4o"
   temperature: 0.1
-  max_tokens: 1000
+  max_tokens: 100000
+  timeout: 180  # Timeout in seconds for LLM API requests
 
 # Folder Configuration
 folders:
@@ -75,6 +76,6 @@ prompts:
 
 # Logging Configuration
 logging:
-  level: "DEBUG"
+  level: "INFO"
   format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
   file: "resume_matcher.log" 
