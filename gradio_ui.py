@@ -279,8 +279,52 @@ def create_ui():
     default_jd = available_jds[0] if available_jds and available_jds[0] != "No job descriptions available" else None
     
     # Create the interface
-    with gr.Blocks(title="Tessa") as interface:
+    with gr.Blocks(title="Tessa", css="""
+        .flashing-red {
+            color: red;
+            animation: flash 1s infinite;
+            font-weight: bold;
+        }
+        @keyframes flash {
+            0%, 50% { opacity: 1; }
+            51%, 100% { opacity: 0.3; }
+        }
+        .disabled-tabs {
+            pointer-events: none;
+            opacity: 0.6;
+        }
+        .disabled-tabs .tab-nav {
+            pointer-events: none;
+        }
+    """) as interface:
         gr.Markdown("# Tessa (Talent Screening Assistant)")
+        
+        # Global processing state
+        processing_state = gr.State(False)
+        
+        # JavaScript to control tab navigation
+        gr.HTML("""
+        <script>
+        function disableTabs() {
+            const tabs = document.querySelectorAll('.tabs');
+            tabs.forEach(tab => {
+                tab.classList.add('disabled-tabs');
+            });
+        }
+        
+        function enableTabs() {
+            const tabs = document.querySelectorAll('.tabs');
+            tabs.forEach(tab => {
+                tab.classList.remove('disabled-tabs');
+            });
+        }
+        
+        // Listen for custom events
+        document.addEventListener('processing-start', disableTabs);
+        document.addEventListener('processing-end', enableTabs);
+        </script>
+        """)
+        
         with gr.Tabs():
             with gr.TabItem("Screen By JD"):
                 with gr.Row():
@@ -311,7 +355,9 @@ def create_ui():
                         )
                         details_state = gr.State([])  # To store detail_buttons data
                         # 1. Add a Markdown component for status/progress above the results table
-                        analyze_status = gr.Markdown("", visible=False)
+                        analyze_status = gr.HTML("", visible=False, elem_classes=["flashing-red"])
+                        # JavaScript trigger for tab control
+                        tab_control_trigger = gr.HTML("", visible=False)
                     # Right Panel
                     with gr.Column(scale=1):
                         if default_jd:
@@ -377,10 +423,13 @@ def create_ui():
                 # 2. In on_analyze, update df_rows to exclude candidate name
                 def on_analyze(jd_name):
                     import gradio as gr
-                    # Show progress bar immediately
-                    yield gr.update(visible=False, value=[]), [], gr.update(interactive=False), gr.update(interactive=False), gr.update(visible=False), gr.update(value='Processing...', visible=True)
+                    # Disable interactive elements and show progress bar immediately
+                    processing_html = '<div class="flashing-red">🔄 Processing... Please wait</div>'
+                    disable_tabs_html = '<script>document.dispatchEvent(new Event("processing-start"));</script>'
+                    yield gr.update(visible=False, value=[]), [], gr.update(interactive=False), gr.update(interactive=False), gr.update(visible=False), gr.update(value=processing_html, visible=True), gr.update(value=disable_tabs_html, visible=True)
                     if not jd_name or jd_name == "No job descriptions available":
-                        yield gr.update(visible=False, value=[]), [], gr.update(interactive=True), gr.update(interactive=True), gr.update(visible=True), gr.update(value='', visible=False)
+                        enable_tabs_html = '<script>document.dispatchEvent(new Event("processing-end"));</script>'
+                        yield gr.update(visible=False, value=[]), [], gr.update(interactive=True), gr.update(interactive=True), gr.update(visible=True), gr.update(value='', visible=False), gr.update(value=enable_tabs_html, visible=True)
                         return
                     total = 0
                     for _ in ui_manager.analyze_jd(jd_name):
@@ -397,8 +446,10 @@ def create_ui():
                         filled = int(bar_len * processed / total) if total else 0
                         bar = '[' + '#' * filled + '-' * (bar_len - filled) + ']'
                         status_msg = f"Processing {processed}/{total} {bar}" if processed < total else ""
-                        yield gr.update(visible=True, value=df_rows), detail_buttons, gr.update(interactive=False), gr.update(interactive=False), gr.update(visible=True), gr.update(value=status_msg, visible=True)
-                    yield gr.update(visible=True, value=df_rows), detail_buttons, gr.update(interactive=True), gr.update(interactive=True), gr.update(visible=True), gr.update(value='', visible=False)
+                        processing_html = f'<div class="flashing-red">🔄 {status_msg}</div>'
+                        yield gr.update(visible=True, value=df_rows), detail_buttons, gr.update(interactive=False), gr.update(interactive=False), gr.update(visible=True), gr.update(value=processing_html, visible=True), gr.update(visible=False)
+                    enable_tabs_html = '<script>document.dispatchEvent(new Event("processing-end"));</script>'
+                    yield gr.update(visible=True, value=df_rows), detail_buttons, gr.update(interactive=True), gr.update(interactive=True), gr.update(visible=True), gr.update(value='', visible=False), gr.update(value=enable_tabs_html, visible=True)
 
                 def on_row_action(evt: gr.SelectData, df, details, jd_name):
                     if isinstance(evt.index, (list, tuple)) and len(evt.index) == 2:
@@ -557,7 +608,7 @@ def create_ui():
                 analyze_btn.click(
                     fn=on_analyze,
                     inputs=[jd_dropdown],
-                    outputs=[results_df, details_state, analyze_btn, jd_dropdown, analyze_tip, analyze_status]
+                    outputs=[results_df, details_state, analyze_btn, jd_dropdown, analyze_tip, analyze_status, tab_control_trigger]
                 )
                 results_df.select(
                     fn=on_row_action,
@@ -574,6 +625,440 @@ def create_ui():
                     inputs=[chat_state],
                     outputs=[download_file]
                 )
+            
+            # New "Screen by Candidate" tab
+            with gr.TabItem("Screen by Candidate"):
+                with gr.Row():
+                    # Left Panel
+                    with gr.Column(scale=1):
+                        gr.Markdown("## Candidate Selection")
+                        with gr.Row():
+                            candidate_dropdown = gr.Dropdown(
+                                choices=ui_manager.cache_manager.get_available_resumes(),
+                                label="Select Candidate",
+                                interactive=True,
+                                value=ui_manager.cache_manager.get_available_resumes()[0] if ui_manager.cache_manager.get_available_resumes() else None
+                            )
+                        
+                        gr.Markdown("## Job Description Selection")
+                        with gr.Row():
+                            jd_multiselect = gr.Dropdown(
+                                choices=ui_manager.get_available_jds(),
+                                label="Select JDs (Optional - Leave empty to analyze against all JDs)",
+                                interactive=True,
+                                multiselect=True,
+                                value=None
+                            )
+                        
+                        # Dynamic Analyze button label for candidate
+                        def get_analyze_candidate_label(candidate_name, selected_jds):
+                            if candidate_name and candidate_name != "No candidates available":
+                                if selected_jds and len(selected_jds) > 0:
+                                    if len(selected_jds) == 1:
+                                        return f"Analyze {candidate_name} for {selected_jds[0]}"
+                                    else:
+                                        return f"Analyze {candidate_name} for {len(selected_jds)} JDs"
+                                else:
+                                    return f"Analyze {candidate_name} for All JDs"
+                            return "Analyze"
+                        
+                        analyze_candidate_btn = gr.Button(get_analyze_candidate_label(candidate_dropdown.value, []), variant="primary")
+                        analyze_candidate_tip = gr.Markdown("**Tip:** Click the '🔍 Analysis' or '▶ Generate' cell in the table below to see details in the right pane.", visible=False)
+                        candidate_results_df = gr.Dataframe(
+                            headers=["Job Description", "Match", "Analysis", "Interview Questions"],
+                            interactive=False,
+                            datatype=["str", "str", "str", "str"],
+                            visible=False
+                        )
+                        candidate_details_state = gr.State([])  # To store detail_buttons data
+                        analyze_candidate_status = gr.HTML("", visible=False, elem_classes=["flashing-red"])
+                        # JavaScript trigger for tab control
+                        candidate_tab_control_trigger = gr.HTML("", visible=False)
+                    
+                    # Right Panel
+                    with gr.Column(scale=1):
+                        if candidate_dropdown.value:
+                            default_candidate_content = ui_manager.cache_manager.get_resume_content(candidate_dropdown.value)
+                            candidate_right_header = gr.Markdown(f"## Candidate: {candidate_dropdown.value}")
+                            candidate_right_view_md = gr.Markdown(
+                                value=f"<div style='max-height:500px; min-height:300px; max-width:100%; overflow:auto; border:1px solid #ddd; border-radius:6px; padding:16px; background:#fafbfc;'><pre style='white-space: pre-wrap; margin:0;'>{default_candidate_content}</pre></div>",
+                                visible=True
+                            )
+                            candidate_chatbox = gr.Chatbot(label="Interview Questions Chat", visible=False, elem_id="candidate-interview-questions-chat", type="messages")
+                            candidate_user_question = gr.Textbox(label="Ask a question about the interview questions", visible=False, placeholder="Type your question and press Enter...")
+                            candidate_send_btn = gr.Button("Send", visible=False)
+                            candidate_chat_state = gr.State([])
+                            candidate_export_btn = gr.Button("Export", visible=False)
+                            candidate_download_file = gr.File(label="Download Chat", visible=False)
+                        else:
+                            candidate_right_header = gr.Markdown("## Views")
+                            candidate_right_view_md = gr.Markdown(
+                                value="<div style='max-height:500px; min-height:300px; max-width:100%; overflow:auto; border:1px solid #ddd; border-radius:6px; padding:16px; background:#fafbfc;'>No candidate selected.</div>",
+                                visible=True
+                            )
+                            candidate_chatbox = gr.Chatbot(label="Interview Questions Chat", visible=False, elem_id="candidate-interview-questions-chat", type="messages")
+                            candidate_user_question = gr.Textbox(label="Ask a question about the interview questions", visible=False, placeholder="Type your question and press Enter...")
+                            candidate_send_btn = gr.Button("Send", visible=False)
+                            candidate_chat_state = gr.State([])
+                            candidate_export_btn = gr.Button("Export", visible=False)
+                            candidate_download_file = gr.File(label="Download Chat", visible=False)
+                
+                # Event handlers for candidate tab
+                def on_candidate_select(candidate_name, selected_jds=None):
+                    if selected_jds is None:
+                        selected_jds = []
+                    if candidate_name and candidate_name != "No candidates available":
+                        content = ui_manager.cache_manager.get_resume_content(candidate_name)
+                        html_box = f"<div style='max-height:500px; min-height:300px; max-width:100%; overflow:auto; border:1px solid #ddd; border-radius:6px; padding:16px; background:#fafbfc;'><pre style='white-space: pre-wrap; margin:0;'>{content}</pre></div>"
+                        return (
+                            gr.update(value=html_box, visible=True),
+                            gr.update(value=f"## Candidate: {candidate_name}"),
+                            gr.update(value=get_analyze_candidate_label(candidate_name, selected_jds)),
+                            gr.update(value=[], visible=False),  # candidate_results_df
+                            [],  # candidate_details_state
+                            gr.update(visible=False),  # analyze_candidate_tip
+                            gr.update(value=[], visible=False),  # candidate_chatbox
+                            gr.update(value="", visible=False),  # candidate_user_question
+                            gr.update(visible=False),  # candidate_send_btn
+                            gr.update(visible=False),  # candidate_export_btn
+                            gr.update(visible=False),  # candidate_download_file
+                            []  # candidate_chat_state
+                        )
+                    return (
+                        gr.update(value="<div style='max-height:500px; min-height:300px; max-width:100%; overflow:auto; border:1px solid #ddd; border-radius:6px; padding:16px; background:#fafbfc;'>No candidate selected.</div>", visible=True),
+                        gr.update(value="## Views"),
+                        gr.update(value="Analyze"),
+                        gr.update(value=[], visible=False),  # candidate_results_df
+                        [],  # candidate_details_state
+                        gr.update(visible=False),  # analyze_candidate_tip
+                        gr.update(value=[], visible=False),  # candidate_chatbox
+                        gr.update(value="", visible=False),  # candidate_user_question
+                        gr.update(visible=False),  # candidate_send_btn
+                        gr.update(visible=False),  # candidate_export_btn
+                        gr.update(visible=False),  # candidate_download_file
+                        []  # candidate_chat_state
+                    )
+                
+                def on_jd_multiselect_change(candidate_name, selected_jds):
+                    if selected_jds is None:
+                        selected_jds = []
+                    return gr.update(value=get_analyze_candidate_label(candidate_name, selected_jds))
+                
+                def on_analyze_candidate(candidate_name, selected_jds=None):
+                    import gradio as gr
+                    import asyncio
+                    # Disable interactive elements and show progress bar immediately
+                    processing_html = '<div class="flashing-red">🔄 Processing... Please wait</div>'
+                    disable_tabs_html = '<script>document.dispatchEvent(new Event("processing-start"));</script>'
+                    yield gr.update(visible=False, value=[]), [], gr.update(interactive=False), gr.update(interactive=False), gr.update(visible=False), gr.update(value=processing_html, visible=True), gr.update(value=disable_tabs_html, visible=True)
+                    
+                    if not candidate_name or candidate_name == "No candidates available":
+                        enable_tabs_html = '<script>document.dispatchEvent(new Event("processing-end"));</script>'
+                        yield gr.update(visible=False, value=[]), [], gr.update(interactive=True), gr.update(interactive=True), gr.update(visible=True), gr.update(value='', visible=False), gr.update(value=enable_tabs_html, visible=True)
+                        return
+                    
+                    # Get JDs to analyze against
+                    if selected_jds and len(selected_jds) > 0:
+                        # Use selected JDs
+                        jds_to_analyze = selected_jds
+                    else:
+                        # Use all available JDs
+                        available_jds = ui_manager.get_available_jds()
+                        jds_to_analyze = [jd for jd in available_jds if jd != "No job descriptions available"]
+                    
+                    if not jds_to_analyze:
+                        enable_tabs_html = '<script>document.dispatchEvent(new Event("processing-end"));</script>'
+                        yield gr.update(visible=False, value=[]), [], gr.update(interactive=True), gr.update(interactive=True), gr.update(visible=True), gr.update(value='', visible=False), gr.update(value=enable_tabs_html, visible=True)
+                        return
+                    
+                    # Analyze candidate against selected/all JDs
+                    results = []
+                    detail_buttons = []
+                    total_jds = len(jds_to_analyze)
+                    processed = 0
+                    
+                    for jd_name in jds_to_analyze:
+                        try:
+                            jd_content = ui_manager.get_jd_content(jd_name)
+                            resume_content = ui_manager.cache_manager.get_resume_content(candidate_name)
+                            result = asyncio.run(ui_manager.analyzer.analyze_resume(jd_content, resume_content))
+                            
+                            # Format result for table display
+                            results.append([
+                                jd_name,
+                                "✅ YES" if result.match else "❌ NO",
+                                "🔍 Analysis",
+                                "▶ Generate"
+                            ])
+                            
+                            # Create detail button data
+                            detail_buttons.append({
+                                'jd_name': jd_name,
+                                'candidate': candidate_name,
+                                'match': result.match,
+                                'summary': result.summary,
+                                'full_analysis': result.summary
+                            })
+                            
+                            processed += 1
+                            # Progress bar: 10 chars, filled for processed, empty for remaining
+                            bar_len = 10
+                            filled = int(bar_len * processed / total_jds) if total_jds else 0
+                            bar = '[' + '#' * filled + '-' * (bar_len - filled) + ']'
+                            status_msg = f"Processing {processed}/{total_jds} {bar}" if processed < total_jds else ""
+                            processing_html = f'<div class="flashing-red">🔄 {status_msg}</div>'
+                            yield gr.update(visible=True, value=results), detail_buttons, gr.update(interactive=False), gr.update(interactive=False), gr.update(visible=True), gr.update(value=processing_html, visible=True), gr.update(visible=False)
+                            
+                        except Exception as e:
+                            results.append([
+                                jd_name,
+                                "❌ ERROR",
+                                "🔍 Analysis",
+                                "▶ Generate"
+                            ])
+                            detail_buttons.append({
+                                'jd_name': jd_name,
+                                'candidate': candidate_name,
+                                'match': False,
+                                'summary': f"Error: {str(e)}",
+                                'full_analysis': f"Error: {str(e)}"
+                            })
+                            processed += 1
+                    
+                    enable_tabs_html = '<script>document.dispatchEvent(new Event("processing-end"));</script>'
+                    yield gr.update(visible=True, value=results), detail_buttons, gr.update(interactive=True), gr.update(interactive=True), gr.update(visible=True), gr.update(value='', visible=False), gr.update(value=enable_tabs_html, visible=True)
+                
+                def on_candidate_row_action(evt: gr.SelectData, df, details, candidate_name):
+                    if isinstance(evt.index, (list, tuple)) and len(evt.index) == 2:
+                        row_idx, col_idx = evt.index
+                    else:
+                        row_idx = evt.index
+                        col_idx = None
+                    print(f"Candidate row action: row_idx={row_idx}, col_idx={col_idx}, details={details}")
+                    
+                    if not details or row_idx is None or row_idx >= len(details):
+                        return (
+                            gr.update(value="No details available.", visible=True),
+                            gr.update(value="## Views"),
+                            gr.update(visible=False),
+                            gr.update(visible=False),
+                            gr.update(visible=False),
+                            gr.update(visible=False),
+                            gr.update(visible=False),
+                            []
+                        )
+                    
+                    btn = details[row_idx]
+                    jd_name = btn.get('jd_name', 'Unknown JD')
+                    
+                    if col_idx == 2:  # 'Analysis' column
+                        header = f"## {candidate_name} match to {jd_name}"
+                        summary_md = btn['summary']  # Markdown text
+                        return (
+                            gr.update(value=summary_md, visible=True),
+                            gr.update(value=header),
+                            gr.update(visible=False),  # candidate_chatbox
+                            gr.update(visible=False),  # candidate_user_question
+                            gr.update(visible=False),  # candidate_send_btn
+                            gr.update(visible=False),  # candidate_export_btn
+                            gr.update(visible=False),  # candidate_download_file
+                            []
+                        )
+                    elif col_idx == 3:  # 'Interview Questions' column
+                        jd_content = ui_manager.get_jd_content(jd_name)
+                        import asyncio
+                        async def get_questions():
+                            try:
+                                output_text = await ui_manager.analyzer.generate_interview_questions(jd_content)
+                                return output_text
+                            except Exception as e:
+                                return f"Error generating interview questions: {e}"
+                        output_text = asyncio.run(get_questions())
+                        chat_init = [
+                            {"role": "assistant", "content": output_text}
+                        ]
+                        return (
+                            gr.update(value="", visible=False),
+                            gr.update(value=f"## Interview Questions: {candidate_name} for {jd_name}"),
+                            gr.update(value=chat_init, visible=True),
+                            gr.update(visible=True, value=""),
+                            gr.update(visible=True),
+                            gr.update(visible=True),  # candidate_export_btn
+                            gr.update(visible=False), # candidate_download_file
+                            chat_init
+                        )
+                    else:
+                        # Ignore clicks on all other columns
+                        return (
+                            gr.update(value="No details available.", visible=True),
+                            gr.update(value="## Views"),
+                            gr.update(visible=False),
+                            gr.update(visible=False),
+                            gr.update(visible=False),
+                            gr.update(visible=False),
+                            gr.update(visible=False),
+                            []
+                        )
+                def on_generate_questions(selected, details):
+                    import gradio as gr
+                    import asyncio
+                    if not details or not selected:
+                        return gr.update(value="<div>No details available.</div>"), gr.update(visible=False), gr.update(visible=False), gr.update(visible=False), gr.update(visible=False), [], gr.update(value="Interview Questions")
+                    resume_name = selected.split(' (')[0]
+                    btn = None
+                    for d in details:
+                        if d['resume'] == resume_name:
+                            btn = d
+                            break
+                    if not btn:
+                        return gr.update(value="<div>No details available.</div>"), gr.update(visible=False), gr.update(visible=False), gr.update(visible=False), gr.update(visible=False), [], gr.update(value="Interview Questions")
+                    jd_name = jd_dropdown.value
+                    jd_content = ui_manager.get_jd_content(jd_name)
+                    if not jd_content:
+                        return gr.update(value="<div>Could not load job description.</div>"), gr.update(visible=False), gr.update(visible=False), gr.update(visible=False), gr.update(visible=False), [], gr.update(value="Interview Questions")
+                    async def get_questions():
+                        try:
+                            output_text = await ui_manager.analyzer.generate_interview_questions(jd_content)
+                            return output_text
+                        except Exception as e:
+                            return f"Error generating interview questions: {e}"
+                    output_text = asyncio.run(get_questions())
+                    chat_history = [
+                        {"role": "assistant", "content": output_text}
+                    ]
+                    return (
+                        gr.update(visible=False),
+                        gr.update(visible=True, value=chat_history),
+                        gr.update(visible=True, value=""),
+                        gr.update(visible=True),
+                        gr.update(visible=True),
+                        chat_history,
+                        gr.update(value="Interview Questions")
+                    )
+                def on_user_question(chat_history, user_input, jd_name, details):
+                    import gradio as gr
+                    import asyncio
+                    if not user_input.strip():
+                        return gr.update(), chat_history
+                    # Use the last selected candidate from details (if available)
+                    btn = details[-1] if details else None
+                    jd_content = ui_manager.get_jd_content(jd_name)
+                    resume_content = ui_manager.cache_manager.get_resume_content(btn['resume']) if btn else ""
+                    # Compose context for follow-up
+                    context = f"Job Description:\n{jd_content}\n\nResume:\n{resume_content}\n\nPrevious Q&A:\n"
+                    for msg in chat_history:
+                        if msg["role"] == "user":
+                            context += f"Q: {msg['content']}\n"
+                        elif msg["role"] == "assistant":
+                            context += f"A: {msg['content']}\n"
+                    prompt = f"{context}\nUser follow-up question: {user_input}\nPlease answer as an expert interviewer."
+                    async def get_response():
+                        try:
+                            agent_result = await ui_manager.analyzer.run(prompt, model=ui_manager.model)
+                            if hasattr(agent_result, 'output'):
+                                output_text = agent_result.output
+                            else:
+                                output_text = str(agent_result)
+                            return output_text
+                        except Exception as e:
+                            return f"Error: {e}"
+                    output_text = asyncio.run(get_response())
+                    chat_history = chat_history + [
+                        {"role": "user", "content": user_input},
+                        {"role": "assistant", "content": output_text}
+                    ]
+                    return gr.update(value=chat_history), chat_history
+                def on_export_chat(chat_history):
+                    import tempfile
+                    chat_text = ""
+                    for msg in chat_history:
+                        chat_text += f"{msg['role'].capitalize()}: {msg['content']}\n\n"
+                    with tempfile.NamedTemporaryFile(delete=False, suffix=".txt", mode="w", encoding="utf-8") as f:
+                        f.write(chat_text)
+                        file_path = f.name
+                    return gr.update(value=file_path, visible=True)
+                def on_export_data(selected, details):
+                    # For now, show 'not implemented' in the Interview Questions output
+                    return gr.update(value="not implemented")
+                
+                # Helper functions for candidate tab
+                def on_candidate_user_question(chat_history, user_input, candidate_name, details):
+                    import gradio as gr
+                    import asyncio
+                    if not user_input.strip():
+                        return gr.update(), chat_history
+                    # Use the last selected JD from details (if available)
+                    btn = details[-1] if details else None
+                    jd_name = btn.get('jd_name', '') if btn else ""
+                    jd_content = ui_manager.get_jd_content(jd_name) if jd_name else ""
+                    resume_content = ui_manager.cache_manager.get_resume_content(candidate_name) if candidate_name else ""
+                    # Compose context for follow-up
+                    context = f"Job Description:\n{jd_content}\n\nResume:\n{resume_content}\n\nPrevious Q&A:\n"
+                    for msg in chat_history:
+                        if msg["role"] == "user":
+                            context += f"Q: {msg['content']}\n"
+                        elif msg["role"] == "assistant":
+                            context += f"A: {msg['content']}\n"
+                    prompt = f"{context}\nUser follow-up question: {user_input}\nPlease answer as an expert interviewer."
+                    async def get_response():
+                        try:
+                            agent_result = await ui_manager.analyzer.run(prompt, model=ui_manager.model)
+                            if hasattr(agent_result, 'output'):
+                                output_text = agent_result.output
+                            else:
+                                output_text = str(agent_result)
+                            return output_text
+                        except Exception as e:
+                            return f"Error: {e}"
+                    output_text = asyncio.run(get_response())
+                    chat_history = chat_history + [
+                        {"role": "user", "content": user_input},
+                        {"role": "assistant", "content": output_text}
+                    ]
+                    return gr.update(value=chat_history), chat_history
+                 
+                def on_candidate_export_chat(chat_history):
+                    import tempfile
+                    chat_text = ""
+                    for msg in chat_history:
+                        chat_text += f"{msg['role'].capitalize()}: {msg['content']}\n\n"
+                    with tempfile.NamedTemporaryFile(delete=False, suffix=".txt", mode="w", encoding="utf-8") as f:
+                        f.write(chat_text)
+                        file_path = f.name
+                    return gr.update(value=file_path, visible=True)
+                
+                # Connect events for candidate tab
+                candidate_dropdown.change(
+                    fn=on_candidate_select,
+                    inputs=[candidate_dropdown, jd_multiselect],
+                    outputs=[candidate_right_view_md, candidate_right_header, analyze_candidate_btn, candidate_results_df, candidate_details_state, analyze_candidate_tip, candidate_chatbox, candidate_user_question, candidate_send_btn, candidate_export_btn, candidate_download_file, candidate_chat_state]
+                )
+                jd_multiselect.change(
+                    fn=on_jd_multiselect_change,
+                    inputs=[candidate_dropdown, jd_multiselect],
+                    outputs=[analyze_candidate_btn]
+                )
+                analyze_candidate_btn.click(
+                    fn=on_analyze_candidate,
+                    inputs=[candidate_dropdown, jd_multiselect],
+                    outputs=[candidate_results_df, candidate_details_state, analyze_candidate_btn, candidate_dropdown, analyze_candidate_tip, analyze_candidate_status, candidate_tab_control_trigger]
+                )
+                candidate_results_df.select(
+                    fn=on_candidate_row_action,
+                    inputs=[candidate_results_df, candidate_details_state, candidate_dropdown],
+                    outputs=[candidate_right_view_md, candidate_right_header, candidate_chatbox, candidate_user_question, candidate_send_btn, candidate_export_btn, candidate_download_file, candidate_chat_state]
+                )
+                candidate_send_btn.click(
+                    fn=on_candidate_user_question,
+                    inputs=[candidate_chat_state, candidate_user_question, candidate_dropdown, candidate_details_state],
+                    outputs=[candidate_chatbox, candidate_chat_state]
+                )
+                candidate_export_btn.click(
+                    fn=on_candidate_export_chat,
+                    inputs=[candidate_chat_state],
+                    outputs=[candidate_download_file]
+                )
+            
             with gr.TabItem("Admin"):
                 gr.Markdown("## Admin: Upload Job Descriptions and Resumes")
                 with gr.Row():

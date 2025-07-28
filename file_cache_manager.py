@@ -164,6 +164,15 @@ class FileCacheManager:
         """
         return list(self.resume_cache.keys())
     
+    def get_available_resumes(self) -> list[str]:
+        """
+        Get all available resume names (alias for get_all_resume_names).
+        
+        Returns:
+            list[str]: List of resume names
+        """
+        return self.get_all_resume_names()
+    
     def get_cache_stats(self) -> Dict[str, int]:
         """
         Get cache statistics.
